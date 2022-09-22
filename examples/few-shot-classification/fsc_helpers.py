@@ -45,6 +45,22 @@ def make_few_shot_classification_dataset(
             num_classes, verbalizers, template)
 
 
+def make_contest_dataset(
+        config: "DictConfig") -> Tuple[PromptedClassificationDataset]:
+    data_dict = {}
+    for split in ['train', 'dev']:
+        source_texts, class_labels, num_classes, verbalizers, template = \
+            load_contest_dataset(config.dataset,
+                                                 config.dataset_seed,
+                                                 split, config.base_path,
+                                                 config.num_shots)
+        fsc_dataset = PromptedClassificationDataset(source_texts,
+                                                    class_labels)
+        data_dict[split] = fsc_dataset
+
+    return (data_dict['train'], data_dict['dev'], num_classes, verbalizers, template)
+
+
 def load_few_shot_classification_dataset(
     dataset: str,
     dataset_seed: Optional[int],
@@ -54,10 +70,12 @@ def load_few_shot_classification_dataset(
 ) -> Tuple[List[str]]:
     assert dataset in ['agnews', 'cr', 'mr', 'sst-2', 
                        'sst-5', 'yelp-2', 'yelp-5']
+    ####################改
     assert split in ['train', 'dev', 'test']
     assert num_shots in [16]
 
     seed_dict = {0:'16-100', 1:'16-13', 2:'16-21', 3:'16-42', 4:'16-87'}
+    ####################改
     seed_path = seed_dict[dataset_seed]
     filepath = f'{num_shots}-shot/{dataset}/{seed_path}/{split}.tsv'
     full_filepath = os.path.join(base_path, filepath)
@@ -70,6 +88,7 @@ def load_few_shot_classification_dataset(
 
     verbalizers = get_dataset_verbalizers(dataset)
     num_classes = len(verbalizers)
+    print(df)
 
     template = None
     if dataset == 'agnews': 
@@ -77,6 +96,52 @@ def load_few_shot_classification_dataset(
 
     return (source_texts, class_labels, 
             num_classes, verbalizers, template)
+
+
+def load_contest_dataset(
+    dataset: str,
+    dataset_seed: Optional[int],
+    split: str,
+    base_path: str,
+    num_shots: int
+) -> Tuple[List[str]]:
+    assert dataset in ['AGNews', 'MRPC', 'SNLI', 'SST-2',
+                       'TREC', 'Yelp']
+    ####################改
+    assert split in ['train', 'dev']
+
+    seed_dict = {0:'8', 1:'13', 2:'42', 3:'50', 4:'60'}
+    ####################改
+    seed_path = seed_dict[dataset_seed]
+    filepath = f'contest/{dataset}/{seed_path}/{split}.tsv'
+    full_filepath = os.path.join(base_path, filepath)
+    df = pd.read_csv(full_filepath, sep='\t')
+    source_texts = df.iloc[:, 0].tolist()
+    class_labels = df.iloc[:, 1].tolist()
+
+    verbalizers = get_contest_verbalizers(dataset)
+    num_classes = len(verbalizers)
+
+    class_labels = encode_contest_label(class_labels, verbalizers)
+
+    template = None
+    if dataset in ['AGNews', 'TREC']:
+        template = "<mask> {prompt} {sentence_1}"
+    elif dataset in ['SST-2', 'Yelp']:
+        template = "{prompt} <mask> {sentence_1}"
+    elif dataset in ['SNLI', 'MRPC']:
+        template = "{sentence_1} {prompt} <mask> {sentence_2}"
+
+    return (source_texts, class_labels,
+            num_classes, verbalizers, template)
+
+
+def encode_contest_label(labels: list, verbalizers: list):
+    encoded_labels = []
+    for label in labels:
+        encode_num = verbalizers.index(label)
+        encoded_labels.append(encode_num)
+    return encoded_labels
 
 
 def get_dataset_verbalizers(dataset: str) -> List[str]: 
@@ -87,6 +152,20 @@ def get_dataset_verbalizers(dataset: str) -> List[str]:
     elif dataset in ['sst-5', 'yelp-5']:
         verbalizers = ['\u0120terrible', '\u0120bad', '\u0120okay', 
                        '\u0120good', '\u0120great'] # num_classes
+    return verbalizers
+
+
+def get_contest_verbalizers(dataset: str) -> List[str]:
+    if dataset in ['SST-2', 'Yelp']:
+        verbalizers = ['negative', 'positive']
+    elif dataset == 'AGNews':
+        verbalizers = ['world', 'sports', 'business', 'technology']
+    elif dataset == 'MRPC':
+        verbalizers = ['Equivalent', 'NotEquivalent']
+    elif dataset == 'SNLI':
+        verbalizers = ['Contradiction', 'Neutral', 'Entailment']
+    elif dataset == 'TREC':
+        verbalizers = ['human', 'description', 'numeric', 'entity', 'location', 'abbreviation']
     return verbalizers
 
 

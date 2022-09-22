@@ -12,7 +12,8 @@ from rlprompt.utils.utils import (colorful_print, compose_hydra_config_store,
 from fsc_helpers import (PromptedClassificationRewardConfig,
                          FewShotClassificationDatasetConfig,
                          make_prompted_classification_reward,
-                         make_few_shot_classification_dataset)
+                         make_few_shot_classification_dataset,
+                         make_contest_dataset)
 
 
 # Compose default config
@@ -22,14 +23,21 @@ config_list = [PromptedClassificationRewardConfig,
 cs = compose_hydra_config_store('base_fsc', config_list)
 
 
-@hydra.main(version_base=None, config_path="./", config_name="fsc_config")
+@hydra.main(version_base=None, config_path="./", config_name="fsc_config_contest")
 def main(config: "DictConfig"):
     colorful_print(OmegaConf.to_yaml(config), fg='red')
     output_dir = get_hydra_output_dir()
 
+    '''
     (train_dataset, val_dataset, test_dataset,
      num_classes, verbalizers, template) = \
         make_few_shot_classification_dataset(config)
+    '''
+
+
+    (train_dataset, val_dataset, num_classes, verbalizers, template) = \
+        make_contest_dataset(config)
+
     print('Train Size:', len(train_dataset))
     print('Examples:', train_dataset[:5])
     print('Val Size', len(val_dataset))
